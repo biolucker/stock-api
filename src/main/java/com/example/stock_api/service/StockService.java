@@ -1,34 +1,45 @@
 package com.example.stock_api.service;
 
 import com.example.stock_api.repository.StockRepository;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class StockService {
 
-    private final StockRepository repository;
+    private final StockRepository stockRepository;
 
-    public StockService(StockRepository repository) {
-        this.repository = repository;
+    public StockService(StockRepository stockRepository) {
+        this.stockRepository = stockRepository;
     }
 
     @Transactional
     public void createOrUpdateStock(Long productId, int stock) {
-        repository.upsertStock(productId, stock, 0, 0);
+        stockRepository.upsertStock(productId, stock, 0, 0);
     }
 
     @Transactional
-    public void sell(Long productId, int quantity) {
-        repository.addSell(productId, quantity);
+    public void sellProduct(Long productId, int quantity) {
+        try {
+            stockRepository.addSell(productId, quantity);
+        } catch (DataAccessException ex) {
+            if (ex.getRootCause() != null &&
+                    ex.getRootCause().getMessage().contains("Not enough stock")) {
+
+                throw new IllegalStateException("Not enough stock available");
+            }
+            throw ex;
+        }
     }
 
     @Transactional
     public void ingress(Long productId, int quantity) {
-        repository.addIngress(productId, quantity);
+        stockRepository.addIngress(productId, quantity);
     }
 
     public int getTotal(Long productId) {
-        return repository.getTotal(productId);
+        return stockRepository.getTotal(productId);
     }
+
 }

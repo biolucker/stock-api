@@ -25,3 +25,118 @@ INSERT INTO products (name, price, created_at) VALUES
 ('Agua Mineral', 200, NOW()),
 ('Helado', 350, NOW()),
 ('Flan', 300, NOW());
+
+CREATE TABLE stock (
+    product_id BIGINT PRIMARY KEY,
+    stock INT NOT NULL DEFAULT 0,
+    sells INT NOT NULL DEFAULT 0,
+    ingress INT NOT NULL DEFAULT 0,
+
+    CONSTRAINT fk_stock_product
+        FOREIGN KEY (product_id)
+        REFERENCES product(id)
+        ON DELETE CASCADE
+);
+
+---------- Stored Procedures ----------
+
+---- update/create stock ----
+
+DELIMITER $$
+
+CREATE PROCEDURE upsert_stock(
+    IN p_product_id BIGINT,
+    IN p_stock INT,
+    IN p_sells INT,
+    IN p_ingress INT
+)
+BEGIN
+    INSERT INTO stock (product_id, stock, sells, ingress)
+    VALUES (p_product_id, p_stock, p_sells, p_ingress)
+    ON DUPLICATE KEY UPDATE
+        stock = p_stock,
+        sells = p_sells,
+        ingress = p_ingress;
+END$$
+
+DELIMITER ;
+
+---- update sells ----
+
+DELIMITER $$
+
+CREATE PROCEDURE add_sell (
+    IN p_product_id BIGINT,
+    IN p_quantity INT
+)
+BEGIN
+    DECLARE current_total INT;
+
+    SELECT (stock - sells + ingress)
+    INTO current_total
+    FROM stock
+    WHERE product_id = p_product_id
+    FOR UPDATE;
+
+    IF current_total IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Stock record not found';
+    END IF;
+
+    IF current_total < p_quantity THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Not enough stock available';
+    END IF;
+
+    UPDATE stock
+    SET sells = sells + p_quantity
+    WHERE product_id = p_product_id;
+END$$
+
+DELIMITER ;
+---- update ingress ----
+
+DELIMITER $$
+
+CREATE PROCEDURE add_ingress(
+    IN p_product_id BIGINT,
+    IN p_quantity INT
+)
+BEGIN
+    UPDATE stock
+    SET ingress = ingress + p_quantity
+    WHERE product_id = p_product_id;
+END$$
+
+DELIMITER ;
+
+---- get total ----
+
+DELIMITER $$
+
+CREATE FUNCTION get_stock_total(p_product_id BIGINT)
+RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE result INT;
+
+    SELECT (stock - sells + ingress)
+    INTO result
+    FROM stock
+    WHERE product_id = p_product_id;
+
+    RETURN result;
+END$$
+
+DELIMITER ;
+
+------Insert Stock------
+
+INSERT INTO stock (product_id, stock, sells, ingress)
+SELECT 
+    p.id,
+    FLOOR(10 + RAND() * 91) AS stock,
+    0 AS sells,
+    0 AS ingress
+FROM products p
+WHERE p.id BETWEEN 1 AND 20;

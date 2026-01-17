@@ -2,6 +2,7 @@ package com.example.stock_api.controller;
 
 
 import com.example.stock_api.service.StockService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -25,12 +26,20 @@ public class StockController {
 
     // Sell product
     @PostMapping("/{productId}/sell")
-    public void sell(
+    public ResponseEntity<?> sell(
             @PathVariable Long productId,
             @RequestParam int quantity
     ) {
-        service.sell(productId, quantity);
+        try {
+            service.sellProduct(productId, quantity);
+            return ResponseEntity.ok("Sell completed");
+        } catch (IllegalStateException ex) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(ex.getMessage());
+        }
     }
+
 
     // Ingress stock
     @PostMapping("/{productId}/ingress")
