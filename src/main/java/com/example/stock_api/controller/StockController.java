@@ -49,7 +49,6 @@ public class StockController {
     ) {
         service.ingress(productId, quantity);
     }
-
     // Get total
     @GetMapping("/{productId}/total")
     public int getTotal(@PathVariable Long productId) {
